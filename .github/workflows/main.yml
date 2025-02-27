@@ -1,4 +1,4 @@
-name: Deploy Spring Boot to EC2 with Apache
+name: Deploy Spring Boot to EC2 with Nginx
 
 on:
   push:
@@ -8,7 +8,7 @@ on:
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
-    
+
     steps:
     - name: Checkout code
       uses: actions/checkout@v3
@@ -44,44 +44,42 @@ jobs:
       run: |
         find hotel-service/target -name "*.jar" -type f -exec scp {} ec2:/home/ubuntu/hbms-backend/hotel-service.jar \;
         
-    - name: Install and configure Apache
+    - name: Install and configure Nginx
       run: |
         ssh ec2 "
-          # Install Apache and required modules if not already installed
+          # Install Nginx if not already installed
           sudo apt-get update
-          sudo apt-get install -y apache2 apache2-utils
+          sudo apt-get install -y nginx
 
           # Install Java 17 if not already installed
           if ! command -v java &> /dev/null || ! java -version 2>&1 | grep -q 'version \"17'; then
             sudo apt-get install -y openjdk-17-jdk
           fi
 
-          # Enable required Apache modules
-          sudo a2enmod proxy proxy_http
-          
-          # Create a virtual host configuration for the Spring Boot app
-          sudo tee /etc/apache2/sites-available/hotel-service.conf > /dev/null << 'EOF'
-          <VirtualHost *:80>
-              ServerAdmin webmaster@localhost
-              DocumentRoot /var/www/html
-              
-              ProxyPreserveHost On
-              ProxyPass / http://localhost:8080/
-              ProxyPassReverse / http://localhost:8080/
-              
-              ErrorLog \${APACHE_LOG_DIR}/hotel-service-error.log
-              CustomLog \${APACHE_LOG_DIR}/hotel-service-access.log combined
-          </VirtualHost>
+          # Create Nginx configuration for the Spring Boot app
+          sudo tee /etc/nginx/sites-available/hotel-service > /dev/null << 'EOF'
+          server {
+              listen 80;
+              server_name localhost;
+
+              location / {
+                  proxy_pass http://localhost:8080;
+                  proxy_set_header Host \$host;
+                  proxy_set_header X-Real-IP \$remote_addr;
+                  proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+                  proxy_set_header X-Forwarded-Proto \$scheme;
+              }
+          }
           EOF
-          
-          # Enable the site configuration
-          sudo a2ensite hotel-service.conf
-          
-          # Check Apache config
-          sudo apache2ctl configtest
-          
-          # Restart Apache
-          sudo systemctl restart apache2
+
+          # Create a symbolic link for Nginx to use this config
+          sudo ln -s /etc/nginx/sites-available/hotel-service /etc/nginx/sites-enabled/
+
+          # Test Nginx configuration
+          sudo nginx -t
+
+          # Restart Nginx to apply the configuration
+          sudo systemctl restart nginx
         "
         
     - name: Deploy and start application
