@@ -21,7 +21,9 @@ jobs:
         cache: maven
         
     - name: Build with Maven
-      run: mvn -B package --file pom.xml
+      run: |
+        cd hotel-service
+        mvn -B package --file pom.xml
       
     - name: Configure SSH
       run: |
@@ -32,23 +34,23 @@ jobs:
         
     - name: Create application directory on EC2
       run: |
-        ssh -i ~/.ssh/ec2_key.pem ubuntu@${{ secrets.EC2_HOST }} "mkdir -p /home/ubuntu/spring-app/logs"
+        ssh -i ~/.ssh/ec2_key.pem ubuntu@${{ secrets.EC2_HOST }} "mkdir -p /home/ubuntu/hbms-backend/logs"
         
     - name: Copy JAR file to EC2
       run: |
-        scp -i ~/.ssh/ec2_key.pem target/*.jar ubuntu@${{ secrets.EC2_HOST }}:/home/ubuntu/spring-app/spring-boot-app.jar
+        scp -i ~/.ssh/ec2_key.pem hotel-service/target/*.jar ubuntu@${{ secrets.EC2_HOST }}:/home/ubuntu/hbms-backend/hotel-service.jar
         
     - name: Create service file
       run: |
-        cat > spring-app.service << EOF
+        cat > hotel-service.service << EOF
         [Unit]
-        Description=Spring Boot Application
+        Description=Hotel Management Service
         After=network.target
         
         [Service]
         User=ubuntu
-        WorkingDirectory=/home/ubuntu/spring-app
-        ExecStart=/usr/bin/java -jar /home/ubuntu/spring-app/spring-boot-app.jar
+        WorkingDirectory=/home/ubuntu/hbms-backend
+        ExecStart=/usr/bin/java -jar /home/ubuntu/hbms-backend/hotel-service.jar
         SuccessExitStatus=143
         TimeoutStopSec=10
         Restart=on-failure
@@ -58,27 +60,27 @@ jobs:
         WantedBy=multi-user.target
         EOF
         
-        scp -i ~/.ssh/ec2_key.pem spring-app.service ubuntu@${{ secrets.EC2_HOST }}:/home/ubuntu/spring-app/
+        scp -i ~/.ssh/ec2_key.pem hotel-service.service ubuntu@${{ secrets.EC2_HOST }}:/home/ubuntu/hbms-backend/
         
     - name: Deploy and start application
       run: |
         ssh -i ~/.ssh/ec2_key.pem ubuntu@${{ secrets.EC2_HOST }} "
           # Stop existing application if running
-          if pgrep -f spring-boot-app.jar > /dev/null; then
-            sudo pkill -f spring-boot-app.jar
+          if pgrep -f hotel-service.jar > /dev/null; then
+            sudo pkill -f hotel-service.jar
             sleep 5
           fi
           
           # Set up as a systemd service if not already done
-          if [ ! -f /etc/systemd/system/spring-app.service ]; then
-            sudo cp /home/ubuntu/spring-app/spring-app.service /etc/systemd/system/
+          if [ ! -f /etc/systemd/system/hotel-service.service ]; then
+            sudo cp /home/ubuntu/hbms-backend/hotel-service.service /etc/systemd/system/
             sudo systemctl daemon-reload
-            sudo systemctl enable spring-app.service
+            sudo systemctl enable hotel-service.service
           fi
           
           # Start or restart the service
-          sudo systemctl restart spring-app.service
+          sudo systemctl restart hotel-service.service
           
           # Check status
-          sudo systemctl status spring-app.service --no-pager
+          sudo systemctl status hotel-service.service --no-pager
         "
