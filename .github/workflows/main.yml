@@ -1,4 +1,4 @@
-name: Deploy Spring Boot to EC2
+name: Deploy Spring Boot to EC2 with Apache
 
 on:
   push:
@@ -25,25 +25,69 @@ jobs:
         cd hotel-service
         mvn -B package --file pom.xml
       
-    - name: Deploy to EC2
-      uses: easingthemes/ssh-deploy@main
-      with:
-        SSH_PRIVATE_KEY: ${{ secrets.EC2_SSH_KEY }}
-        REMOTE_HOST: ${{ secrets.EC2_HOST }}
-        REMOTE_USER: ubuntu
-        SOURCE: "hotel-service/target/*.jar"
-        TARGET: "/home/ubuntu/hbms-backend"
-        ARGS: "-o StrictHostKeyChecking=no"
+    - name: Setup SSH
+      run: |
+        mkdir -p ~/.ssh
+        echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/key.pem
+        chmod 600 ~/.ssh/key.pem
+        echo "Host ec2
+          HostName ${{ secrets.EC2_HOST }}
+          User ubuntu
+          IdentityFile ~/.ssh/key.pem
+          StrictHostKeyChecking no
+        " > ~/.ssh/config
+    
+    - name: Create deployment directory
+      run: ssh ec2 "mkdir -p /home/ubuntu/hbms-backend"
         
-    - name: Create and execute deployment script
-      uses: appleboy/ssh-action@v1.0.0
-      with:
-        host: ${{ secrets.EC2_HOST }}
-        username: ubuntu
-        key: ${{ secrets.EC2_SSH_KEY }}
-        script_stop: true
-        script: |
-          # Create systemd service file
+    - name: Copy JAR file
+      run: |
+        find hotel-service/target -name "*.jar" -type f -exec scp {} ec2:/home/ubuntu/hbms-backend/hotel-service.jar \;
+        
+    - name: Install and configure Apache
+      run: |
+        ssh ec2 "
+          # Install Apache and required modules if not already installed
+          sudo apt-get update
+          sudo apt-get install -y apache2 apache2-utils
+
+          # Install Java 17 if not already installed
+          if ! command -v java &> /dev/null || ! java -version 2>&1 | grep -q 'version \"17'; then
+            sudo apt-get install -y openjdk-17-jdk
+          fi
+
+          # Enable required Apache modules
+          sudo a2enmod proxy proxy_http
+          
+          # Create a virtual host configuration for the Spring Boot app
+          sudo tee /etc/apache2/sites-available/hotel-service.conf > /dev/null << 'EOF'
+          <VirtualHost *:80>
+              ServerAdmin webmaster@localhost
+              DocumentRoot /var/www/html
+              
+              ProxyPreserveHost On
+              ProxyPass / http://localhost:8080/
+              ProxyPassReverse / http://localhost:8080/
+              
+              ErrorLog \${APACHE_LOG_DIR}/hotel-service-error.log
+              CustomLog \${APACHE_LOG_DIR}/hotel-service-access.log combined
+          </VirtualHost>
+          EOF
+          
+          # Enable the site configuration
+          sudo a2ensite hotel-service.conf
+          
+          # Check Apache config
+          sudo apache2ctl configtest
+          
+          # Restart Apache
+          sudo systemctl restart apache2
+        "
+        
+    - name: Deploy and start application
+      run: |
+        ssh ec2 "
+          # Create a systemd service file for the Spring Boot application
           cat > /home/ubuntu/hbms-backend/hotel-service.service << 'EOF'
           [Unit]
           Description=Hotel Management Service
@@ -52,7 +96,7 @@ jobs:
           [Service]
           User=ubuntu
           WorkingDirectory=/home/ubuntu/hbms-backend
-          ExecStart=/usr/bin/java -jar /home/ubuntu/hbms-backend/hotel-service-*.jar
+          ExecStart=/usr/bin/java -jar /home/ubuntu/hbms-backend/hotel-service.jar
           SuccessExitStatus=143
           TimeoutStopSec=10
           Restart=on-failure
@@ -62,8 +106,8 @@ jobs:
           WantedBy=multi-user.target
           EOF
           
-          # Stop running service
-          sudo systemctl stop hotel-service.service || true
+          # Stop running service if it exists
+          sudo systemctl stop hotel-service.service 2>/dev/null || true
           
           # Install service
           sudo cp /home/ubuntu/hbms-backend/hotel-service.service /etc/systemd/system/
@@ -72,3 +116,7 @@ jobs:
           
           # Start service
           sudo systemctl start hotel-service.service
+          
+          # Show status
+          sudo systemctl status hotel-service.service --no-pager || true
+        "
