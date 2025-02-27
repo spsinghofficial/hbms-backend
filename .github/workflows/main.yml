@@ -25,56 +25,50 @@ jobs:
         cd hotel-service
         mvn -B package --file pom.xml
       
-    - name: Create service file
-      run: |
-        cat > hotel-service.service << EOF
-        [Unit]
-        Description=Hotel Management Service
-        After=network.target
-        
-        [Service]
-        User=ubuntu
-        WorkingDirectory=/home/ubuntu/hbms-backend
-        ExecStart=/usr/bin/java -jar /home/ubuntu/hbms-backend/hotel-service.jar
-        SuccessExitStatus=143
-        TimeoutStopSec=10
-        Restart=on-failure
-        RestartSec=5
-        
-        [Install]
-        WantedBy=multi-user.target
-        EOF
-    
-    - name: Copy files to EC2
-      uses: appleboy/scp-action@master
-      with:
-        host: ${{ secrets.EC2_HOST }}
-        username: ubuntu
-        key: ${{ secrets.EC2_SSH_KEY }}
-        source: "hotel-service/target/*.jar,hotel-service.service"
-        target: "/home/ubuntu/hbms-backend"
-        strip_components: 2
-        
     - name: Deploy to EC2
-      uses: appleboy/ssh-action@master
+      uses: easingthemes/ssh-deploy@main
+      with:
+        SSH_PRIVATE_KEY: ${{ secrets.EC2_SSH_KEY }}
+        REMOTE_HOST: ${{ secrets.EC2_HOST }}
+        REMOTE_USER: ubuntu
+        SOURCE: "hotel-service/target/*.jar"
+        TARGET: "/home/ubuntu/hbms-backend"
+        ARGS: "-o StrictHostKeyChecking=no"
+        
+    - name: Create and execute deployment script
+      uses: appleboy/ssh-action@v1.0.0
       with:
         host: ${{ secrets.EC2_HOST }}
         username: ubuntu
         key: ${{ secrets.EC2_SSH_KEY }}
+        script_stop: true
         script: |
-          # Stop existing application if running
-          if pgrep -f hotel-service.jar > /dev/null; then
-            sudo pkill -f hotel-service.jar || true
-            sleep 5
-          fi
+          # Create systemd service file
+          cat > /home/ubuntu/hbms-backend/hotel-service.service << 'EOF'
+          [Unit]
+          Description=Hotel Management Service
+          After=network.target
           
-          # Set up as a systemd service
+          [Service]
+          User=ubuntu
+          WorkingDirectory=/home/ubuntu/hbms-backend
+          ExecStart=/usr/bin/java -jar /home/ubuntu/hbms-backend/hotel-service-*.jar
+          SuccessExitStatus=143
+          TimeoutStopSec=10
+          Restart=on-failure
+          RestartSec=5
+          
+          [Install]
+          WantedBy=multi-user.target
+          EOF
+          
+          # Stop running service
+          sudo systemctl stop hotel-service.service || true
+          
+          # Install service
           sudo cp /home/ubuntu/hbms-backend/hotel-service.service /etc/systemd/system/
           sudo systemctl daemon-reload
           sudo systemctl enable hotel-service.service
           
-          # Start or restart the service
-          sudo systemctl restart hotel-service.service
-          
-          # Check status
-          sudo systemctl status hotel-service.service --no-pager
+          # Start service
+          sudo systemctl start hotel-service.service
