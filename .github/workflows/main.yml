@@ -25,21 +25,6 @@ jobs:
         cd hotel-service
         mvn -B package --file pom.xml
       
-    - name: Configure SSH
-      run: |
-        mkdir -p ~/.ssh
-        echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/ec2_key.pem
-        chmod 600 ~/.ssh/ec2_key.pem
-        ssh-keyscan -H ${{ secrets.EC2_HOST }} >> ~/.ssh/known_hosts
-        
-    - name: Create application directory on EC2
-      run: |
-        ssh -i ~/.ssh/ec2_key.pem ubuntu@${{ secrets.EC2_HOST }} "mkdir -p /home/ubuntu/hbms-backend/logs"
-        
-    - name: Copy JAR file to EC2
-      run: |
-        scp -i ~/.ssh/ec2_key.pem hotel-service/target/*.jar ubuntu@${{ secrets.EC2_HOST }}:/home/ubuntu/hbms-backend/hotel-service.jar
-        
     - name: Create service file
       run: |
         cat > hotel-service.service << EOF
@@ -59,28 +44,37 @@ jobs:
         [Install]
         WantedBy=multi-user.target
         EOF
+    
+    - name: Copy files to EC2
+      uses: appleboy/scp-action@master
+      with:
+        host: ${{ secrets.EC2_HOST }}
+        username: ubuntu
+        key: ${{ secrets.EC2_SSH_KEY }}
+        source: "hotel-service/target/*.jar,hotel-service.service"
+        target: "/home/ubuntu/hbms-backend"
+        strip_components: 2
         
-        scp -i ~/.ssh/ec2_key.pem hotel-service.service ubuntu@${{ secrets.EC2_HOST }}:/home/ubuntu/hbms-backend/
-        
-    - name: Deploy and start application
-      run: |
-        ssh -i ~/.ssh/ec2_key.pem ubuntu@${{ secrets.EC2_HOST }} "
+    - name: Deploy to EC2
+      uses: appleboy/ssh-action@master
+      with:
+        host: ${{ secrets.EC2_HOST }}
+        username: ubuntu
+        key: ${{ secrets.EC2_SSH_KEY }}
+        script: |
           # Stop existing application if running
           if pgrep -f hotel-service.jar > /dev/null; then
-            sudo pkill -f hotel-service.jar
+            sudo pkill -f hotel-service.jar || true
             sleep 5
           fi
           
-          # Set up as a systemd service if not already done
-          if [ ! -f /etc/systemd/system/hotel-service.service ]; then
-            sudo cp /home/ubuntu/hbms-backend/hotel-service.service /etc/systemd/system/
-            sudo systemctl daemon-reload
-            sudo systemctl enable hotel-service.service
-          fi
+          # Set up as a systemd service
+          sudo cp /home/ubuntu/hbms-backend/hotel-service.service /etc/systemd/system/
+          sudo systemctl daemon-reload
+          sudo systemctl enable hotel-service.service
           
           # Start or restart the service
           sudo systemctl restart hotel-service.service
           
           # Check status
           sudo systemctl status hotel-service.service --no-pager
-        "
