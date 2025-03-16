@@ -1,0 +1,120 @@
+name: Deploy Spring Boot to EC2 with Nginx
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+      
+    - name: Set up JDK 17
+      uses: actions/setup-java@v3
+      with:
+        java-version: '17'
+        distribution: 'temurin'
+        cache: maven
+        
+    - name: Build with Maven
+      run: |
+        cd hotel-service
+        mvn -B package --file pom.xml
+      
+    - name: Setup SSH
+      run: |
+        mkdir -p ~/.ssh
+        echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/key.pem
+        chmod 600 ~/.ssh/key.pem
+        echo "Host ec2
+          HostName ${{ secrets.EC2_HOST }}
+          User ubuntu
+          IdentityFile ~/.ssh/key.pem
+          StrictHostKeyChecking no
+        " > ~/.ssh/config
+    
+    - name: Create deployment directory
+      run: ssh ec2 "mkdir -p /home/ubuntu/hbms-backend"
+        
+    - name: Copy JAR file
+      run: |
+        find hotel-service/target -name "*.jar" -type f -exec scp {} ec2:/home/ubuntu/hbms-backend/hotel-service.jar \;
+        
+    - name: Install and configure Nginx
+      run: |
+        ssh ec2 "
+          # Install Nginx if not already installed
+          sudo apt-get update
+          sudo apt-get install -y nginx
+
+          # Install Java 17 if not already installed
+          if ! command -v java &> /dev/null || ! java -version 2>&1 | grep -q 'version \"17'; then
+            sudo apt-get install -y openjdk-17-jdk
+          fi
+
+          # Create Nginx configuration for the Spring Boot app
+          sudo tee /etc/nginx/sites-available/hotel-service > /dev/null << 'EOF'
+          server {
+              listen 80;
+              server_name localhost;
+
+              location / {
+                  proxy_pass http://localhost:8080;
+                  proxy_set_header Host \$host;
+                  proxy_set_header X-Real-IP \$remote_addr;
+                  proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+                  proxy_set_header X-Forwarded-Proto \$scheme;
+              }
+          }
+          EOF
+
+          # Create a symbolic link for Nginx to use this config
+          sudo ln -s /etc/nginx/sites-available/hotel-service /etc/nginx/sites-enabled/
+
+          # Test Nginx configuration
+          sudo nginx -t
+
+          # Restart Nginx to apply the configuration
+          sudo systemctl restart nginx
+        "
+        
+    - name: Deploy and start application
+      run: |
+        ssh ec2 "
+          # Create a systemd service file for the Spring Boot application
+          cat > /home/ubuntu/hbms-backend/hotel-service.service << 'EOF'
+          [Unit]
+          Description=Hotel Management Service
+          After=network.target
+          
+          [Service]
+          User=ubuntu
+          WorkingDirectory=/home/ubuntu/hbms-backend
+          ExecStart=/usr/bin/java -jar /home/ubuntu/hbms-backend/hotel-service.jar
+          SuccessExitStatus=143
+          TimeoutStopSec=10
+          Restart=on-failure
+          RestartSec=5
+          
+          [Install]
+          WantedBy=multi-user.target
+          EOF
+          
+          # Stop running service if it exists
+          sudo systemctl stop hotel-service.service 2>/dev/null || true
+          
+          # Install service
+          sudo cp /home/ubuntu/hbms-backend/hotel-service.service /etc/systemd/system/
+          sudo systemctl daemon-reload
+          sudo systemctl enable hotel-service.service
+          
+          # Start service
+          sudo systemctl start hotel-service.service
+          
+          # Show status
+          sudo systemctl status hotel-service.service --no-pager || true
+        "
