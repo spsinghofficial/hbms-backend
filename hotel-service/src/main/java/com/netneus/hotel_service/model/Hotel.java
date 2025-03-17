@@ -1,9 +1,10 @@
 package com.netneus.hotel_service.model;
 
 import lombok.*;
+import lombok.experimental.SuperBuilder;
 
 @Data
-@Builder
+@SuperBuilder 
 @EqualsAndHashCode(callSuper=true)
 public class Hotel extends BaseModel{
     private String address;

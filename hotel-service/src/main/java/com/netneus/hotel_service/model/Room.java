@@ -2,6 +2,8 @@ package com.netneus.hotel_service.model;
 
 import java.util.List;
 
+import lombok.experimental.SuperBuilder;
+@SuperBuilder
 public class Room extends BaseModel{
     private double basePrice;
     private List<Facility> facilities;
