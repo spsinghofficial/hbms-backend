@@ -2,10 +2,7 @@ package com.netneus.hotel_service.model;
 
 import java.time.LocalDateTime;
 
-import lombok.Builder;
 import lombok.Data;
-import lombok.NoArgsConstructor;
-import lombok.RequiredArgsConstructor;
 import lombok.experimental.SuperBuilder;
 
 @Data
