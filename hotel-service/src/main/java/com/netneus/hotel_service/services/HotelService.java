@@ -13,7 +13,7 @@ import java.util.Optional;
 public class HotelService {
 
     private final List<Hotel> hotels = new ArrayList<>();
-    private int nextId = 1; // Simple ID generator
+    private Long nextId = 1L; // Simple ID generator
     @PostConstruct
     public void init() {
         // Add default hotels
