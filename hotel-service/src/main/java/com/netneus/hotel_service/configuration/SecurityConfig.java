@@ -6,17 +6,18 @@ import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.web.SecurityFilterChain;
 
 import static org.springframework.security.config.Customizer.withDefaults;
+
 @Configuration
 public class SecurityConfig {
     @Bean
     SecurityFilterChain defaultSecurityFilterChain(HttpSecurity http) throws Exception {
         System.out.println("Security Filter Chain from custom");
+        http.csrf(csrf -> csrf.disable());
+        http.authorizeHttpRequests((requests) -> requests.anyRequest().permitAll());
+        // http.authorizeHttpRequests((requests) -> requests.anyRequest().denyAll());
 
-       http.authorizeHttpRequests((requests) -> requests.anyRequest().permitAll());
-//        http.authorizeHttpRequests((requests) -> requests.anyRequest().denyAll());
-
-        http.formLogin(withDefaults());
-        http.httpBasic(withDefaults());
+        // http.formLogin(withDefaults());
+        // http.httpBasic(withDefaults());
         return http.build();
     }
 }

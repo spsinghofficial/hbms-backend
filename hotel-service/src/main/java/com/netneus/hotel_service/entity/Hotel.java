@@ -5,12 +5,14 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.Table;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
+
 @Data
-@SuperBuilder 
-@EqualsAndHashCode(callSuper=true)
+@SuperBuilder
+@EqualsAndHashCode(callSuper = true)
 @Table
 @Entity
-public class Hotel extends BaseModel{
+@RequiredArgsConstructor
+public class Hotel extends BaseModel {
     @Schema(description = "Hotel address", example = "123 Main St", required = true)
     private String address;
 

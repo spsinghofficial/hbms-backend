@@ -10,11 +10,13 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.MappedSuperclass;
 import lombok.Data;
+import lombok.RequiredArgsConstructor;
 import lombok.experimental.SuperBuilder;
 
 @Data
 @SuperBuilder
 @MappedSuperclass
+@RequiredArgsConstructor
 public class BaseModel {
     @Id
     @GeneratedValue(strategy = GenerationType.AUTO)

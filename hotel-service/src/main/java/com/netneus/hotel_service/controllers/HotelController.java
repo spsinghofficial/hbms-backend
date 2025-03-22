@@ -7,7 +7,6 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -27,7 +26,7 @@ public class HotelController {
     // Create a hotel
     @PostMapping
     public ResponseEntity<Hotel> createHotel(@RequestBody Hotel hotel) {
-        Hotel createdHotel = hotelService.createHotel(hotel);
+        final Hotel createdHotel = hotelService.createHotel(hotel);
         return new ResponseEntity<>(createdHotel, HttpStatus.CREATED);
     }
 
@@ -39,14 +38,14 @@ public class HotelController {
             @ApiResponse(responseCode = "401", description = "User is unauthorized")
         })
     public ResponseEntity<List<Hotel>> getAllHotels() {
-        List<Hotel> hotels = hotelService.getAllHotels();
+        final List<Hotel> hotels = hotelService.getAllHotels();
         return new ResponseEntity<>(hotels, HttpStatus.OK);
     }
 
     // Get a hotel by ID
     @GetMapping("/{id}")
     @Operation(summary = "Get hotel by ID", description = "Fetch a hotel using its ID")
-    public ResponseEntity<Hotel> getHotelById(@PathVariable int id) {
+    public ResponseEntity<Hotel> getHotelById(@PathVariable Long id) {
         return hotelService.getHotelById(id)
                 .map(hotel -> new ResponseEntity<>(hotel, HttpStatus.OK))
                 .orElse(new ResponseEntity<>(HttpStatus.NOT_FOUND));
@@ -54,19 +53,16 @@ public class HotelController {
 
     // Update a hotel
     @PutMapping("/{id}")
-    public ResponseEntity<Hotel> updateHotel(@PathVariable int id, @RequestBody Hotel hotel) {
-        return hotelService.updateHotel(id, hotel)
-                .map(updatedHotel -> new ResponseEntity<>(updatedHotel, HttpStatus.OK))
-                .orElse(new ResponseEntity<>(HttpStatus.NOT_FOUND));
+    public ResponseEntity<Hotel> updateHotel(@PathVariable Long id, @RequestBody Hotel hotel) {
+        return new ResponseEntity<>(hotelService.updateHotel(id, hotel), HttpStatus.OK);
+                
     }
 
     // Delete a hotel
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> deleteHotel(@PathVariable int id) {
-        boolean deleted = hotelService.deleteHotel(id);
-        return deleted
-                ? new ResponseEntity<>(HttpStatus.NO_CONTENT)
-                : new ResponseEntity<>(HttpStatus.NOT_FOUND);
+    public ResponseEntity<Void> deleteHotel(@PathVariable Long id) {
+        hotelService.deleteHotel(id);
+        return ResponseEntity.ok().build();
     }
 }
 
