@@ -1,5 +1,6 @@
 package com.netneus.hotel_service.services;
 
+import com.netneus.hotel_service.exception.HotelNotFoundException;
 import lombok.RequiredArgsConstructor;
 
 import org.springframework.stereotype.Service;
@@ -32,6 +33,7 @@ public class HotelService implements IHotelService {
 
     // Update
     public Hotel updateHotel(Long id, Hotel updatedHotel) {
+        repository.findById(id).orElseThrow(()-> {throw new HotelNotFoundException("Hotel not found ");});
        updatedHotel.setId(id);
        return repository.save(updatedHotel);
     }

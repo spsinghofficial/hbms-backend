@@ -1,0 +1,31 @@
+# Ignore IDE settings
+.idea/
+.vscode/
+*.iml
+
+# Ignore build artifacts
+hotel-service/target/
+hotel-service/*.jar
+hotel-service/*.war
+hotel-service/*.ear
+
+# Ignore logs
+hotel-service/logs/
+hotel-service/*.log
+
+# Ignore Eclipse-specific files
+.project
+.classpath
+.settings/
+hotel-service/.project
+hotel-service/.classpath
+hotel-service/.settings/
+
+# Ignore temporary files
+*.tmp
+*.swp
+*.swo
+
+# Ignore OS-specific files
+.DS_Store
+Thumbs.db
