@@ -1,8 +1,6 @@
 name: Deploy Spring Boot to EC2 with Nginx
 
 on:
-  push:
-    branches: [ main ]
   workflow_dispatch:
 
 jobs:
