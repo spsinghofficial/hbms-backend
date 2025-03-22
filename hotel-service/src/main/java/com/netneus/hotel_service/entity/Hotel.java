@@ -1,4 +1,4 @@
-package com.netneus.hotel_service.model;
+package com.netneus.hotel_service.entity;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.*;
@@ -7,6 +7,9 @@ import lombok.experimental.SuperBuilder;
 @Data
 @SuperBuilder 
 @EqualsAndHashCode(callSuper=true)
+@Table
+
+
 public class Hotel extends BaseModel{
     @Schema(description = "Hotel address", example = "123 Main St", required = true)
     private String address;

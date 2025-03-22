@@ -1,4 +1,4 @@
-package com.netneus.hotel_service.model;
+package com.netneus.hotel_service.entity;
 
 import java.util.*; // Should trigger AvoidStarImport
 import java.io.*; // Should trigger AvoidStarImport

@@ -1,6 +1,6 @@
 package com.netneus.hotel_service.controllers;
 
-import com.netneus.hotel_service.model.Hotel;
+import com.netneus.hotel_service.entity.Hotel;
 import com.netneus.hotel_service.services.HotelService;
 
 import io.swagger.v3.oas.annotations.Operation;

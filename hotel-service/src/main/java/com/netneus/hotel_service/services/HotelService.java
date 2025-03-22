@@ -1,8 +1,9 @@
 package com.netneus.hotel_service.services;
 
-import com.netneus.hotel_service.model.Hotel;
 import jakarta.annotation.PostConstruct;
 import org.springframework.stereotype.Service;
+
+import com.netneus.hotel_service.entity.Hotel;
 
 import java.util.ArrayList;
 import java.util.List;

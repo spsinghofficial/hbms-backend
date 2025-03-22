@@ -1,4 +1,4 @@
-package com.netneus.hotel_service.model;
+package com.netneus.hotel_service.entity;
 
 import java.time.LocalDateTime;
 
